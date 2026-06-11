@@ -4,3 +4,4 @@
 
 console.log("¡Hola Mundo desde JavaScript!");
 console.log("Este programa fue ejecutado automáticamente por GitHub Actions.");
+
