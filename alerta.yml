@@ -1,0 +1,30 @@
+name: Alerta de Push a Main
+
+# 🔁 DISPARADOR: Se activa cuando se hace push a la rama main
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  notificar:
+    name: Enviar Notificación a ntfy.sh
+    runs-on: ubuntu-latest
+
+    steps:
+      # ✅ Paso 1: Hacer checkout del repositorio
+      - name: Checkout del repositorio
+        uses: actions/checkout@v3
+
+      # ✅ Paso 2: Ejecutar el programa Hola Mundo
+      - name: Ejecutar Hola Mundo
+        run: node hola-mundo.js
+
+      # ✅ Paso 3: Enviar notificación a ntfy.sh/devops-itla
+      - name: Enviar notificación a ntfy.sh
+        run: |
+          curl -X POST https://ntfy.sh/devops-itla \
+            -H "Title: ✅ Nuevo Push Detectado" \
+            -H "Priority: high" \
+            -H "Tags: rocket,github" \
+            -d "🚀 Se realizó un push al repositorio en la rama main. Autor: ${{ github.actor }} | Commit: ${{ github.sha }}"
