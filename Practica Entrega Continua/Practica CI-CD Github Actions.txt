@@ -1,0 +1,73 @@
+Continuacion Practica Anterior - CI/CD con GitHub Actions
+
+Continuacion de la Practica de Entrega Continua, usando el mismo codigo y
+repositorio. Se automatiza con GitHub Actions la construccion y subida de la
+imagen a Docker Hub, y el despliegue de la aplicacion a produccion en Render.
+
+
+1. Descripcion del workflow
+
+El archivo del pipeline se encuentra en la ruta .github/workflows/docker-render.yml
+dentro de la raiz del repositorio, que es la ubicacion que exige GitHub Actions.
+
+El workflow se ejecuta automaticamente ante un push a las ramas main o
+Electiva-integracion-continua, y tambien puede ser lanzado de forma manual desde
+la pestana Actions gracias al disparador workflow_dispatch.
+
+Esta compuesto por dos jobs encadenados:
+
+Job 1 - build-and-push (Construir y subir imagen a Docker Hub)
+Descarga el codigo del repositorio, configura Docker Buildx, inicia sesion en
+Docker Hub usando las credenciales almacenadas como secretos, y construye la
+imagen a partir del Dockerfile de la carpeta Practica Entrega Continua. La imagen
+se publica con dos etiquetas: latest y el hash del commit, de modo que cada version
+desplegada queda identificada y se puede volver a una anterior si hace falta.
+
+Job 2 - deploy (Desplegar a produccion en Render)
+Se ejecuta solamente si el job anterior termino con exito, gracias a la directiva
+needs. Realiza una peticion POST a la API de Render para disparar un nuevo
+despliegue del servicio, autenticandose con la API key. El script verifica el
+codigo de respuesta HTTP y falla de forma explicita si Render rechaza la peticion,
+evitando que el pipeline reporte exito cuando el despliegue no ocurrio.
+
+
+2. Secretos requeridos en GitHub
+
+El workflow no contiene ninguna credencial escrita en el codigo. Todas se leen
+desde los secretos del repositorio, configurados en GitHub en la ruta
+Settings, Secrets and variables, Actions, New repository secret.
+
+DOCKERHUB_USERNAME    Usuario de Docker Hub
+DOCKERHUB_TOKEN       Access token generado en Docker Hub, en Account Settings,
+                      Personal access tokens, con permiso de Read y Write
+RENDER_API_KEY        API key generada en Render, en Account Settings, API Keys
+RENDER_SERVICE_ID     Identificador del servicio en Render, visible en la URL del
+                      panel del servicio, con el formato srv-xxxxxxxxxxxx
+
+
+3. Configuracion del servicio en Render
+
+En Render se creo un servicio de tipo Web Service con origen Existing Image,
+apuntando a la imagen publicada en Docker Hub printbagm/hola-mundo-devops:latest.
+El puerto configurado es el 5000, que es el que expone la aplicacion Flask.
+
+
+4. Ciclo completo de DevOps automatizado
+
+El flujo queda de la siguiente manera. El desarrollador hace push del codigo al
+repositorio, GitHub Actions detecta el cambio y dispara el pipeline, se construye
+la imagen Docker y se publica en Docker Hub, y finalmente se notifica a Render
+para que descargue la nueva imagen y actualice la aplicacion en produccion. Todo
+el proceso ocurre sin intervencion manual.
+
+
+5. Enlaces de la entrega
+
+Repositorio de GitHub:
+https://github.com/Printbriandev/Electiva-2-devops
+
+Imagen en Docker Hub:
+https://hub.docker.com/r/printbagm/hola-mundo-devops
+
+Aplicacion desplegada en produccion:
+(completar con la URL que entrega Render una vez creado el servicio)
