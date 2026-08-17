@@ -49,7 +49,11 @@ RENDER_SERVICE_ID     Identificador del servicio en Render, visible en la URL de
 
 En Render se creo un servicio de tipo Web Service con origen Existing Image,
 apuntando a la imagen publicada en Docker Hub printbagm/hola-mundo-devops:latest.
-El puerto configurado es el 5000, que es el que expone la aplicacion Flask.
+
+Ademas se modifico la aplicacion para que lea el puerto desde la variable de
+entorno PORT, manteniendo el 5000 como valor por defecto. Esto es necesario porque
+Render inyecta dicha variable y espera que el servicio escuche en el puerto que
+le asigna, mientras que en la ejecucion local se sigue usando el 5000.
 
 
 4. Ciclo completo de DevOps automatizado
@@ -70,4 +74,16 @@ Imagen en Docker Hub:
 https://hub.docker.com/r/printbagm/hola-mundo-devops
 
 Aplicacion desplegada en produccion:
-(completar con la URL que entrega Render una vez creado el servicio)
+https://hola-mundo-devops-latest-oxkt.onrender.com
+
+
+6. Verificacion del funcionamiento
+
+El pipeline se ejecuto de forma completa y ambos jobs finalizaron correctamente.
+El job de Docker Hub construyo y publico la imagen, y el job de Render recibio el
+codigo HTTP 201 de la API, confirmando que el despliegue fue aceptado e iniciado.
+
+Se verifico que la aplicacion responde en produccion devolviendo el codigo HTTP 200
+y el mensaje "Hola Mundo - Practica Entrega Continua (DevOps)", lo que confirma que
+el ciclo completo de DevOps quedo automatizado de extremo a extremo, desde el push
+del codigo hasta la aplicacion corriendo en produccion.
