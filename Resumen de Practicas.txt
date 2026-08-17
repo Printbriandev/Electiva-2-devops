@@ -1,0 +1,214 @@
+RESUMEN DE PRACTICAS - ELECTIVA SEGURIDAD EN APPS WEB
+Agosto 2026
+
+Documento de referencia con el proceso completo de las practicas realizadas,
+los comandos utilizados, las verificaciones hechas y los enlaces de entrega.
+
+
+===============================================================================
+ENLACES DE ENTREGA (RESUMEN RAPIDO)
+===============================================================================
+
+Aplicacion en produccion (Render):
+https://hola-mundo-devops-latest-oxkt.onrender.com
+
+Imagen en Docker Hub:
+https://hub.docker.com/r/printbagm/hola-mundo-devops
+
+Repositorio en GitHub:
+https://github.com/Printbriandev/Electiva-2-devops/tree/Electiva-integracion-continua
+
+Evidencia del pipeline ejecutado:
+https://github.com/Printbriandev/Electiva-2-devops/actions/runs/31996610996
+
+
+===============================================================================
+PRACTICA 1 - OBSERVABILIDAD
+===============================================================================
+
+Consigna: listar 3 herramientas de observabilidad y/o monitoreo, indicando su
+funcionalidad y ventajas.
+
+Se eligieron tres herramientas que cubren pilares distintos de la observabilidad,
+para no repetir el mismo tipo de dato:
+
+Prometheus, orientado a metricas y series temporales, con modelo pull y alerting
+mediante Alertmanager.
+
+Grafana, orientado a visualizacion y dashboards, conectandose a multiples fuentes
+de datos distintas.
+
+ELK Stack (Elasticsearch, Logstash, Kibana), orientado a la recoleccion, indexado
+y analisis centralizado de logs.
+
+Archivo de entrega:
+Practica Observabilidad/Practica Observabilidad.txt
+
+
+===============================================================================
+PRACTICA 2 - ENTREGA CONTINUA (DOCKER + DOCKER HUB)
+===============================================================================
+
+Consigna: crear una app web hola mundo, empaquetarla con Docker y subir la imagen
+a Docker Hub.
+
+PASO 1 - Aplicacion web
+Se desarrollo una app en Python con Flask que responde en la ruta raiz con el
+mensaje "Hola Mundo - Practica Entrega Continua (DevOps)". Escucha en 0.0.0.0
+para ser accesible desde fuera del contenedor.
+
+PASO 2 - Dockerfile
+Basado en python:3.12-slim. Instala dependencias desde requirements.txt, copia el
+codigo, expone el puerto 5000 y arranca la aplicacion.
+
+Comandos utilizados:
+docker build -t hola-mundo-devops:latest .
+docker run -d --name hola -p 5000:5000 hola-mundo-devops:latest
+
+Verificacion: la aplicacion respondio HTTP 200 con el mensaje esperado.
+
+PASO 3 - Subida a Docker Hub
+docker login
+docker tag hola-mundo-devops:latest printbagm/hola-mundo-devops:latest
+docker push printbagm/hola-mundo-devops:latest
+
+Problema encontrado: el primer push fallo con el error
+"push access denied ... insufficient_scope: authorization failed".
+Causa: la cuenta de Docker Hub se habia creado con GitHub, pero el CLI local no
+estaba autenticado (el archivo ~/.docker/config.json tenia "auths" vacio).
+Ademas el usuario real de Docker Hub resulto ser printbagm y no el nombre que se
+habia asumido inicialmente, ya que al registrarse con GitHub el username asignado
+puede no coincidir con el de git.
+
+Solucion: iniciar sesion en Docker Desktop, reetiquetar la imagen con el usuario
+correcto y repetir el push.
+
+Verificacion final: se confirmo con "docker manifest inspect" que la imagen existe
+en el registro remoto, y que el digest coincide con el de la construccion local.
+Tambien se verifico en una ventana sin sesion iniciada que el repositorio es
+publico y accesible.
+
+Archivos de entrega:
+Practica Entrega Continua/app.py
+Practica Entrega Continua/Dockerfile
+Practica Entrega Continua/requirements.txt
+Practica Entrega Continua/Practica Entrega Continua.txt
+
+
+===============================================================================
+PRACTICA 3 - CI/CD AUTOMATIZADO CON GITHUB ACTIONS
+===============================================================================
+
+Consigna: continuar con el mismo repositorio y automatizar con GitHub Actions la
+subida de la imagen a Docker Hub y el despliegue a produccion.
+
+ARCHIVO DEL PIPELINE
+.github/workflows/docker-render.yml, ubicado en la raiz del repositorio, que es
+la ruta que exige GitHub Actions.
+
+Disparadores: push a las ramas main y Electiva-integracion-continua, y ejecucion
+manual mediante workflow_dispatch.
+
+Job 1 - build-and-push
+Checkout del codigo, configuracion de Docker Buildx, login en Docker Hub con
+credenciales tomadas de los secretos, y construccion y publicacion de la imagen
+con dos etiquetas: latest y el hash del commit. La etiqueta por hash permite
+identificar que version esta desplegada y volver atras si hace falta.
+
+Job 2 - deploy
+Se ejecuta solo si el job anterior tuvo exito, usando la directiva needs. Hace un
+POST a la API de Render para disparar el despliegue, y verifica el codigo de
+respuesta HTTP, fallando de forma explicita si Render rechaza la peticion. Esto
+evita que el pipeline reporte exito cuando el despliegue no ocurrio.
+
+SECRETOS CONFIGURADOS EN GITHUB
+Ruta: Settings, Secrets and variables, Actions, New repository secret.
+
+DOCKERHUB_USERNAME    Usuario de Docker Hub
+DOCKERHUB_TOKEN       Access token con permisos Read & Write
+RENDER_API_KEY        API key generada en Render
+RENDER_SERVICE_ID     Identificador del servicio en Render (srv-...)
+
+Ninguna credencial quedo escrita en el codigo del repositorio.
+
+CONFIGURACION DEL SERVICIO EN RENDER
+Se creo un Web Service con origen "Existing Image", apuntando a la imagen
+printbagm/hola-mundo-devops:latest publicada en Docker Hub.
+
+PROBLEMAS ENCONTRADOS Y SOLUCIONES
+
+Problema 1: la primera ejecucion no llegaba a arrancar, con el mensaje
+"The job was not started because your account is locked due to a billing issue".
+Causa: un problema de facturacion en la cuenta de GitHub bloqueaba la ejecucion
+de Actions. Se resolvio regularizando el pago.
+
+Problema 2: el job de login fallaba con "Username and password required".
+Causa: los secretos aun no estaban cargados. Se resolvio al configurarlos.
+
+Problema 3: la aplicacion tenia el puerto 5000 fijo en el codigo, pero Render
+inyecta la variable de entorno PORT y espera que el servicio escuche en el puerto
+que le asigna. Se modifico app.py para leer PORT desde el entorno manteniendo
+5000 como valor por defecto, de modo que sigue funcionando igual en local.
+
+VERIFICACION FINAL
+Ejecucion completa del pipeline con ambos jobs en verde. El job de Render devolvio
+codigo HTTP 201, confirmando que el despliegue fue aceptado. Se verifico que la
+aplicacion responde en produccion con HTTP 200 y el mensaje correcto, lo que
+confirma que el ciclo quedo automatizado de extremo a extremo, desde el push del
+codigo hasta la aplicacion corriendo en produccion.
+
+Archivos de entrega:
+.github/workflows/docker-render.yml
+Practica Entrega Continua/Practica CI-CD Github Actions.txt
+
+
+===============================================================================
+PRACTICA 4 - MAPA MENTAL DE MEJORES PRACTICAS EN DEVOPS
+===============================================================================
+
+Consigna: elaborar un mapa mental sobre las mejores practicas en DevOps.
+
+Se elaboro un grafico con un nodo central "DevOps - Mejores Practicas" del que
+parten las 10 areas del documento, cada una con sus ideas derivadas. Se mantuvo
+la numeracion y el orden del documento original, y se asigno un color distinto a
+cada rama para diferenciarlas visualmente.
+
+Las 10 areas representadas:
+1. Cultura y Colaboracion
+2. Automatizacion
+3. Gestion de Configuracion
+4. Seguridad (DevSecOps)
+5. Supervision y Metricas
+6. Escalabilidad y Resiliencia
+7. Iteracion y Mejora Continua
+8. Uso de Herramientas Adecuadas
+9. Documentacion
+10. Adaptacion a la Nube
+
+Archivos de entrega:
+Practica Mapa Mental DevOps/mapa-mental-devops.png   (para subir a la plataforma)
+Practica Mapa Mental DevOps/mapa-mental-devops.pdf   (vectorial, para imprimir)
+Practica Mapa Mental DevOps/mapa-mental-devops.svg   (fuente editable)
+
+
+===============================================================================
+NOTAS OPERATIVAS
+===============================================================================
+
+Plan gratuito de Render: el servicio se suspende tras aproximadamente 15 minutos
+sin trafico. La primera visita despues de ese periodo puede tardar entre 30 y 50
+segundos en responder mientras el servicio vuelve a levantarse. Conviene abrir la
+URL unos minutos antes de una demostracion.
+
+Manejo de credenciales: los tokens y API keys se copiaron directamente desde el
+sitio que los emite y se pegaron en el formulario de secretos de GitHub, sin
+guardarlos en archivos ni en el historial. Un token de Docker Hub que quedo
+expuesto durante el proceso fue revocado y reemplazado por uno nuevo.
+
+Repositorios anidados: dentro de la carpeta de la materia existen varios
+directorios que son repositorios git independientes, con su propio .git
+(1erparcial-electiva-2, ansible-lab, Electiva, Electiva-2-devops,
+practica-ansible-docker, practica-python-mysql-docker). No fueron incluidos en
+este repositorio porque git los agregaria como referencias vacias en lugar de
+subir sus archivos. Si se quisieran integrar, habria que eliminar su .git interno,
+perdiendo su historial individual, o subirlos por separado a sus propios remotos.
