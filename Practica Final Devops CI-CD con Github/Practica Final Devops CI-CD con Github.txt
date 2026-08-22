@@ -1,0 +1,194 @@
+Practica Final DevOps - CI/CD con GitHub
+Valor: 20 pts
+
+
+Objetivo
+
+Integrar en una sola practica todo lo aprendido en el curso: un repositorio git
+con una aplicacion web, pruebas unitarias automatizadas, contenerizacion con
+Docker y un pipeline de GitHub Actions que ante cada push instala dependencias,
+ejecuta las pruebas, publica la imagen en Docker Hub y despliega la aplicacion
+en produccion.
+
+
+1. Repositorio git con la aplicacion web Hola Mundo
+
+La aplicacion se escribio en Python con el framework Flask y vive en la carpeta
+"Practica Final Devops CI-CD con Github" del repositorio.
+
+Archivo app.py
+
+La aplicacion se construye dentro de la funcion crear_app, lo que permite crear
+instancias independientes durante las pruebas sin arrancar un servidor real.
+Expone dos rutas:
+
+  /         Devuelve el texto "Hola Mundo - Practica Final DevOps CI/CD con GitHub"
+  /salud    Devuelve un JSON con el estado del servicio, util para comprobar
+            desde el pipeline que la aplicacion quedo viva en produccion
+
+El puerto se lee de la variable de entorno PORT, con 5000 como valor por defecto.
+Esto es obligatorio porque Render asigna dinamicamente el puerto e inyecta esa
+variable en el contenedor, mientras que en local se sigue trabajando con el 5000.
+
+Dependencias
+
+  requirements.txt        flask y gunicorn, lo que necesita la aplicacion para correr
+  requirements-dev.txt    pytest, que solo hace falta para ejecutar las pruebas
+
+Se separaron a proposito en dos archivos para que la imagen de Docker no cargue
+con herramientas de desarrollo que en produccion no se usan.
+
+
+2. Prueba unitaria
+
+Archivo test_app.py, escrito con pytest.
+
+Se define un fixture llamado cliente que crea la aplicacion en modo TESTING y
+devuelve un cliente de pruebas de Flask. Con ese cliente se hacen peticiones HTTP
+simuladas sin necesidad de levantar el servidor.
+
+Las pruebas son cuatro:
+
+  test_la_raiz_responde_200
+      Comprueba que la ruta / responde con codigo HTTP 200.
+
+  test_la_raiz_devuelve_el_mensaje_hola_mundo
+      Comprueba que el cuerpo de la respuesta es exactamente el mensaje esperado
+      y que contiene el texto "Hola Mundo".
+
+  test_salud_devuelve_json_con_estado_ok
+      Comprueba que la ruta /salud responde 200 y devuelve el JSON correcto.
+
+  test_una_ruta_inexistente_devuelve_404
+      Comprueba el caso negativo: una ruta que no existe debe devolver 404.
+
+Ejecucion local de las pruebas:
+
+  cd "Practica Final Devops CI-CD con Github"
+  pip install -r requirements.txt -r requirements-dev.txt
+  pytest -v
+
+Resultado obtenido: 4 passed.
+
+
+3. Dockerfile
+
+El Dockerfile de la carpeta contiene lo siguiente:
+
+  - Parte de la imagen oficial python:3.12-slim, una base ligera.
+  - Define PYTHONDONTWRITEBYTECODE y PYTHONUNBUFFERED para que no se generen
+    archivos .pyc y para que los logs salgan inmediatamente, que es lo que
+    espera cualquier plataforma que recolecte la salida del contenedor.
+  - Copia primero requirements.txt e instala las dependencias, y solo despues
+    copia app.py. De esta forma Docker reutiliza la capa de dependencias en
+    cache mientras no cambien las librerias, y las reconstrucciones son rapidas.
+  - Crea el usuario appuser y ejecuta el contenedor con ese usuario en lugar de
+    root, que es una buena practica de seguridad.
+  - Arranca la aplicacion con gunicorn, un servidor WSGI apto para produccion,
+    en lugar del servidor de desarrollo de Flask.
+
+Ejecucion local con Docker:
+
+  cd "Practica Final Devops CI-CD con Github"
+  docker build -t practica-final-devops .
+  docker run -p 5000:5000 practica-final-devops
+
+La aplicacion queda disponible en http://localhost:5000
+
+El archivo .dockerignore evita que entren a la imagen las pruebas, las cachees
+y los archivos de documentacion.
+
+
+4. GitHub Actions: el pipeline CI/CD
+
+El workflow esta en .github/workflows/practica-final-cicd.yml, en la raiz del
+repositorio, que es la ruta que exige GitHub Actions.
+
+Disparadores
+
+Se ejecuta ante un push a las ramas main o Electiva-integracion-continua, ante un
+pull request, y tambien de forma manual desde la pestana Actions gracias a
+workflow_dispatch. Se agrego un filtro paths para que el pipeline solo corra
+cuando cambian los archivos de esta practica o el propio workflow, y no en cada
+push del resto del repositorio.
+
+Job 1 - pruebas (Instalar dependencias y ejecutar pruebas unitarias)
+Descarga el codigo, instala Python 3.12 con cache de pip, instala las
+dependencias de requirements.txt y requirements-dev.txt, y ejecuta pytest -v.
+Si alguna prueba falla, el pipeline se detiene aqui y no se publica nada.
+
+Job 2 - build-and-push (Construir y subir la imagen a Docker Hub)
+Depende del job anterior mediante needs, asi que solo corre si las pruebas
+pasaron. Configura Docker Buildx, inicia sesion en Docker Hub con las
+credenciales guardadas como secretos y construye la imagen desde el Dockerfile
+de la carpeta de la practica. La publica con dos etiquetas: latest y el hash del
+commit, de modo que cada version queda identificada y se puede volver atras.
+Usa la cache de GitHub Actions para acelerar las reconstrucciones.
+Este job se salta en los pull requests, para no publicar imagenes de codigo que
+todavia no se ha integrado.
+
+Job 3 - deploy (Publicar en produccion en Render)
+Depende del job anterior. Hace una peticion POST a la API de Render para lanzar
+un nuevo despliegue del servicio, autenticandose con la API key. Verifica el
+codigo HTTP devuelto y falla de forma explicita si Render rechaza la peticion,
+para que el pipeline nunca reporte exito cuando el despliegue no ocurrio.
+Despues consulta la URL de produccion en un bucle de reintentos hasta recibir un
+200, confirmando que la version nueva quedo realmente publicada y respondiendo.
+
+
+5. Secretos y variables configurados en GitHub
+
+Ninguna credencial esta escrita en el codigo. Todas se leen desde los secretos
+del repositorio, en Settings, Secrets and variables, Actions.
+
+Secretos:
+
+  DOCKERHUB_USERNAME        Usuario de Docker Hub
+  DOCKERHUB_TOKEN           Access token de Docker Hub con permisos Read y Write
+  RENDER_API_KEY            API key generada en Render, en Account Settings
+  RENDER_SERVICE_ID_FINAL   Identificador del servicio de esta practica en Render,
+                            con el formato srv-xxxxxxxxxxxx
+
+Variable:
+
+  URL_PRODUCCION            URL publica de la aplicacion, que usa el ultimo paso
+                            del pipeline para verificar que responde 200
+
+
+6. Configuracion del servicio en Render
+
+En Render se creo un Web Service de tipo Existing Image, apuntando a la imagen
+publicada en Docker Hub printbagm/practica-final-devops:latest. Render descarga
+esa imagen, inyecta la variable PORT y expone el servicio por HTTPS.
+
+
+7. Ciclo completo automatizado
+
+El flujo de extremo a extremo queda asi:
+
+  1. El desarrollador hace push del codigo al repositorio.
+  2. GitHub Actions detecta el cambio y dispara el pipeline.
+  3. Se instalan las dependencias y se ejecutan las pruebas unitarias.
+  4. Si las pruebas pasan, se construye la imagen Docker y se sube a Docker Hub.
+  5. Se notifica a Render, que descarga la nueva imagen y la publica.
+  6. El pipeline comprueba que la aplicacion responde en produccion.
+
+Todo el proceso ocurre sin ninguna intervencion manual, y cualquier fallo en una
+etapa detiene las siguientes.
+
+
+8. Enlaces de la entrega
+
+Repositorio publico de GitHub:
+https://github.com/Printbriandev/Electiva-2-devops
+
+Imagen en Docker Hub:
+https://hub.docker.com/r/printbagm/practica-final-devops
+
+Aplicacion desplegada en produccion:
+PENDIENTE
+
+
+9. Verificacion del funcionamiento
+
+PENDIENTE

@@ -1,0 +1,121 @@
+name: Practica Final - CI/CD (Pruebas, Docker Hub y Render)
+
+on:
+  push:
+    branches:
+      - main
+      - Electiva-integracion-continua
+    paths:
+      - 'Practica Final Devops CI-CD con Github/**'
+      - '.github/workflows/practica-final-cicd.yml'
+  pull_request:
+    paths:
+      - 'Practica Final Devops CI-CD con Github/**'
+      - '.github/workflows/practica-final-cicd.yml'
+  workflow_dispatch:
+
+env:
+  IMAGEN: printbagm/practica-final-devops
+  CARPETA: Practica Final Devops CI-CD con Github
+
+jobs:
+  pruebas:
+    name: Instalar dependencias y ejecutar pruebas unitarias
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            Practica Final Devops CI-CD con Github/requirements.txt
+            Practica Final Devops CI-CD con Github/requirements-dev.txt
+
+      - name: Instalar dependencias
+        working-directory: ${{ env.CARPETA }}
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Ejecutar la prueba unitaria
+        working-directory: ${{ env.CARPETA }}
+        run: pytest -v
+
+  build-and-push:
+    name: Construir y subir la imagen a Docker Hub
+    runs-on: ubuntu-latest
+    needs: pruebas
+    if: github.event_name != 'pull_request'
+
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Iniciar sesion en Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Construir y subir la imagen
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ env.CARPETA }}
+          push: true
+          tags: |
+            ${{ env.IMAGEN }}:latest
+            ${{ env.IMAGEN }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Publicar en produccion en Render
+    runs-on: ubuntu-latest
+    needs: build-and-push
+
+    steps:
+      - name: Disparar el despliegue en Render
+        run: |
+          RESPUESTA=$(curl -s -w "\n%{http_code}" -X POST \
+            "https://api.render.com/v1/services/${{ secrets.RENDER_SERVICE_ID_FINAL }}/deploys" \
+            -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{"clearCache": "do_not_clear"}')
+
+          CODIGO=$(echo "$RESPUESTA" | tail -n 1)
+          CUERPO=$(echo "$RESPUESTA" | sed '$d')
+
+          echo "Codigo HTTP: $CODIGO"
+          echo "Respuesta: $CUERPO"
+
+          if [ "$CODIGO" -ne 201 ] && [ "$CODIGO" -ne 200 ]; then
+            echo "Error: Render rechazo el despliegue"
+            exit 1
+          fi
+
+          echo "Despliegue iniciado correctamente en Render"
+
+      - name: Verificar que la aplicacion responde en produccion
+        if: vars.URL_PRODUCCION != ''
+        run: |
+          echo "Esperando a que Render publique la nueva version..."
+          for INTENTO in $(seq 1 20); do
+            CODIGO=$(curl -s -o /dev/null -w "%{http_code}" "${{ vars.URL_PRODUCCION }}" || true)
+            echo "Intento $INTENTO - codigo HTTP: $CODIGO"
+            if [ "$CODIGO" = "200" ]; then
+              echo "La aplicacion responde correctamente en produccion"
+              curl -s "${{ vars.URL_PRODUCCION }}"
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "Error: la aplicacion no respondio 200 despues de varios intentos"
+          exit 1
