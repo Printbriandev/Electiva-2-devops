@@ -1,0 +1,26 @@
+Practica Observabilidad
+
+Requisitos de finalizacion
+
+Lista 3 herramientas de observabilidad y/o monitoreo, indicando su funcionalidad y ventajas.
+
+
+1. Prometheus
+
+Funcionalidad: Sistema de monitoreo y alertas de codigo abierto orientado a metricas. Recolecta datos en forma de series temporales mediante un modelo pull, consultando periodicamente endpoints (/metrics) expuestos por las aplicaciones y servicios. Incluye un lenguaje de consultas propio llamado PromQL y se integra con Alertmanager para gestionar y enrutar alertas.
+
+Ventajas: Tiene un modelo de datos multidimensional basado en etiquetas que permite consultas muy flexibles. No depende de una base de datos externa, ya que almacena los datos localmente de forma eficiente. Cuenta con un gran ecosistema de exporters para monitorear bases de datos, servidores, contenedores, etc. Es considerado un estandar de facto en entornos Kubernetes y microservicios.
+
+
+2. Grafana
+
+Funcionalidad: Plataforma de visualizacion y creacion de dashboards. No almacena datos por si misma, sino que se conecta a multiples fuentes como Prometheus, Elasticsearch, Loki, InfluxDB o MySQL, para representar metricas, logs y trazas en graficos, paneles y tableros interactivos en tiempo real.
+
+Ventajas: Es compatible con una gran cantidad de fuentes de datos distintas dentro de un mismo dashboard. Permite crear alertas visuales y notificaciones, por ejemplo a Slack o correo electronico, directamente desde los paneles. Sus dashboards son altamente personalizables y admiten plantillas reutilizables. Ademas ofrece una interfaz intuitiva que facilita compartir informacion con equipos tecnicos y no tecnicos.
+
+
+3. ELK Stack (Elasticsearch, Logstash, Kibana)
+
+Funcionalidad: Conjunto de herramientas para la recoleccion, procesamiento, almacenamiento y analisis centralizado de logs. Logstash, o alternativamente Beats, recolecta y transforma los registros, Elasticsearch los indexa y permite realizar busquedas rapidas sobre grandes volumenes de datos, y Kibana ofrece una interfaz de visualizacion y exploracion de esa informacion.
+
+Ventajas: Centraliza los logs de multiples fuentes y servicios en un solo lugar, lo que facilita el diagnostico de problemas. Permite busquedas y analisis casi en tiempo real sobre grandes volumenes de datos, siendo escalable horizontalmente. Kibana permite crear dashboards y visualizaciones especificas para logs. Es una herramienta con amplia adopcion en la industria, con gran cantidad de documentacion y soporte de la comunidad.

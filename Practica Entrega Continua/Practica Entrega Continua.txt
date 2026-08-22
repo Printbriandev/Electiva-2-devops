@@ -1,0 +1,53 @@
+Practica Entrega Continua
+
+En esta practica veremos el ciclo completo de DevOps.
+
+
+1. Aplicacion web Hola Mundo
+
+Se desarrollo una aplicacion web sencilla en Python utilizando el framework Flask.
+El archivo app.py levanta un servidor web que responde en la ruta raiz con el mensaje
+"Hola Mundo - Practica Entrega Continua (DevOps)".
+La aplicacion escucha en el puerto 5000 y en la direccion 0.0.0.0 para poder ser
+accedida desde fuera del contenedor.
+
+Archivos de la aplicacion:
+app.py               Codigo fuente de la aplicacion web
+requirements.txt     Dependencias del proyecto (Flask)
+
+
+2. Dockerfile y creacion de la imagen
+
+Se creo un Dockerfile que parte de la imagen oficial python:3.12-slim, establece el
+directorio de trabajo en /app, instala las dependencias declaradas en requirements.txt,
+copia el codigo fuente, expone el puerto 5000 y define como comando de arranque la
+ejecucion de la aplicacion.
+
+Comando utilizado para construir la imagen:
+docker build -t hola-mundo-devops:latest .
+
+Comando utilizado para probar la imagen localmente:
+docker run -d --name hola -p 5000:5000 hola-mundo-devops:latest
+
+La aplicacion respondio correctamente en http://localhost:5000 devolviendo el codigo
+de estado HTTP 200 y el mensaje "Hola Mundo - Practica Entrega Continua (DevOps)".
+
+
+3. Subida de la imagen a Docker Hub
+
+Se etiqueto la imagen con el nombre del repositorio de Docker Hub y luego se subio
+al registro publico.
+
+Comandos utilizados:
+docker login
+docker tag hola-mundo-devops:latest printbagm/hola-mundo-devops:latest
+docker push printbagm/hola-mundo-devops:latest
+
+
+4. URL de la imagen en Docker Hub
+
+https://hub.docker.com/r/printbagm/hola-mundo-devops
+
+Para descargar y ejecutar la imagen desde cualquier maquina:
+docker pull printbagm/hola-mundo-devops:latest
+docker run -d -p 5000:5000 printbagm/hola-mundo-devops:latest

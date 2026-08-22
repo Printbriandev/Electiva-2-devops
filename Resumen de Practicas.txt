@@ -1,0 +1,374 @@
+RESUMEN DE PRACTICAS - ELECTIVA SEGURIDAD EN APPS WEB
+Agosto 2026
+
+Documento de referencia con el proceso completo de las practicas realizadas,
+los comandos utilizados, las verificaciones hechas y los enlaces de entrega.
+
+
+===============================================================================
+ENLACES DE ENTREGA (RESUMEN RAPIDO)
+===============================================================================
+
+Repositorio publico en GitHub (comun a todas las practicas):
+https://github.com/Printbriandev/Electiva-2-devops
+
+--- PRACTICA FINAL - CI/CD CON GITHUB ---
+
+Aplicacion en produccion (Render):
+https://practica-final-devops-tip1.onrender.com
+
+Imagen en Docker Hub:
+https://hub.docker.com/r/printbagm/practica-final-devops
+
+Evidencia del pipeline ejecutado:
+https://github.com/Printbriandev/Electiva-2-devops/actions/runs/32550763835
+
+--- PRACTICAS ANTERIORES (ENTREGA CONTINUA Y CI/CD) ---
+
+Aplicacion en produccion (Render):
+https://hola-mundo-devops-latest-oxkt.onrender.com
+
+Imagen en Docker Hub:
+https://hub.docker.com/r/printbagm/hola-mundo-devops
+
+Evidencia del pipeline ejecutado:
+https://github.com/Printbriandev/Electiva-2-devops/actions/runs/31996610996
+
+
+===============================================================================
+PRACTICA 1 - OBSERVABILIDAD
+===============================================================================
+
+Consigna: listar 3 herramientas de observabilidad y/o monitoreo, indicando su
+funcionalidad y ventajas.
+
+Se eligieron tres herramientas que cubren pilares distintos de la observabilidad,
+para no repetir el mismo tipo de dato:
+
+Prometheus, orientado a metricas y series temporales, con modelo pull y alerting
+mediante Alertmanager.
+
+Grafana, orientado a visualizacion y dashboards, conectandose a multiples fuentes
+de datos distintas.
+
+ELK Stack (Elasticsearch, Logstash, Kibana), orientado a la recoleccion, indexado
+y analisis centralizado de logs.
+
+Archivo de entrega:
+Practica Observabilidad/Practica Observabilidad.txt
+
+
+===============================================================================
+PRACTICA 2 - ENTREGA CONTINUA (DOCKER + DOCKER HUB)
+===============================================================================
+
+Consigna: crear una app web hola mundo, empaquetarla con Docker y subir la imagen
+a Docker Hub.
+
+PASO 1 - Aplicacion web
+Se desarrollo una app en Python con Flask que responde en la ruta raiz con el
+mensaje "Hola Mundo - Practica Entrega Continua (DevOps)". Escucha en 0.0.0.0
+para ser accesible desde fuera del contenedor.
+
+PASO 2 - Dockerfile
+Basado en python:3.12-slim. Instala dependencias desde requirements.txt, copia el
+codigo, expone el puerto 5000 y arranca la aplicacion.
+
+Comandos utilizados:
+docker build -t hola-mundo-devops:latest .
+docker run -d --name hola -p 5000:5000 hola-mundo-devops:latest
+
+Verificacion: la aplicacion respondio HTTP 200 con el mensaje esperado.
+
+PASO 3 - Subida a Docker Hub
+docker login
+docker tag hola-mundo-devops:latest printbagm/hola-mundo-devops:latest
+docker push printbagm/hola-mundo-devops:latest
+
+Problema encontrado: el primer push fallo con el error
+"push access denied ... insufficient_scope: authorization failed".
+Causa: la cuenta de Docker Hub se habia creado con GitHub, pero el CLI local no
+estaba autenticado (el archivo ~/.docker/config.json tenia "auths" vacio).
+Ademas el usuario real de Docker Hub resulto ser printbagm y no el nombre que se
+habia asumido inicialmente, ya que al registrarse con GitHub el username asignado
+puede no coincidir con el de git.
+
+Solucion: iniciar sesion en Docker Desktop, reetiquetar la imagen con el usuario
+correcto y repetir el push.
+
+Verificacion final: se confirmo con "docker manifest inspect" que la imagen existe
+en el registro remoto, y que el digest coincide con el de la construccion local.
+Tambien se verifico en una ventana sin sesion iniciada que el repositorio es
+publico y accesible.
+
+Archivos de entrega:
+Practica Entrega Continua/app.py
+Practica Entrega Continua/Dockerfile
+Practica Entrega Continua/requirements.txt
+Practica Entrega Continua/Practica Entrega Continua.txt
+
+
+===============================================================================
+PRACTICA 3 - CI/CD AUTOMATIZADO CON GITHUB ACTIONS
+===============================================================================
+
+Consigna: continuar con el mismo repositorio y automatizar con GitHub Actions la
+subida de la imagen a Docker Hub y el despliegue a produccion.
+
+ARCHIVO DEL PIPELINE
+.github/workflows/docker-render.yml, ubicado en la raiz del repositorio, que es
+la ruta que exige GitHub Actions.
+
+Disparadores: push a las ramas main y Electiva-integracion-continua, y ejecucion
+manual mediante workflow_dispatch.
+
+Job 1 - build-and-push
+Checkout del codigo, configuracion de Docker Buildx, login en Docker Hub con
+credenciales tomadas de los secretos, y construccion y publicacion de la imagen
+con dos etiquetas: latest y el hash del commit. La etiqueta por hash permite
+identificar que version esta desplegada y volver atras si hace falta.
+
+Job 2 - deploy
+Se ejecuta solo si el job anterior tuvo exito, usando la directiva needs. Hace un
+POST a la API de Render para disparar el despliegue, y verifica el codigo de
+respuesta HTTP, fallando de forma explicita si Render rechaza la peticion. Esto
+evita que el pipeline reporte exito cuando el despliegue no ocurrio.
+
+SECRETOS CONFIGURADOS EN GITHUB
+Ruta: Settings, Secrets and variables, Actions, New repository secret.
+
+DOCKERHUB_USERNAME    Usuario de Docker Hub
+DOCKERHUB_TOKEN       Access token con permisos Read & Write
+RENDER_API_KEY        API key generada en Render
+RENDER_SERVICE_ID     Identificador del servicio en Render (srv-...)
+
+Ninguna credencial quedo escrita en el codigo del repositorio.
+
+CONFIGURACION DEL SERVICIO EN RENDER
+Se creo un Web Service con origen "Existing Image", apuntando a la imagen
+printbagm/hola-mundo-devops:latest publicada en Docker Hub.
+
+PROBLEMAS ENCONTRADOS Y SOLUCIONES
+
+Problema 1: la primera ejecucion no llegaba a arrancar, con el mensaje
+"The job was not started because your account is locked due to a billing issue".
+Causa: un problema de facturacion en la cuenta de GitHub bloqueaba la ejecucion
+de Actions. Se resolvio regularizando el pago.
+
+Problema 2: el job de login fallaba con "Username and password required".
+Causa: los secretos aun no estaban cargados. Se resolvio al configurarlos.
+
+Problema 3: la aplicacion tenia el puerto 5000 fijo en el codigo, pero Render
+inyecta la variable de entorno PORT y espera que el servicio escuche en el puerto
+que le asigna. Se modifico app.py para leer PORT desde el entorno manteniendo
+5000 como valor por defecto, de modo que sigue funcionando igual en local.
+
+VERIFICACION FINAL
+Ejecucion completa del pipeline con ambos jobs en verde. El job de Render devolvio
+codigo HTTP 201, confirmando que el despliegue fue aceptado. Se verifico que la
+aplicacion responde en produccion con HTTP 200 y el mensaje correcto, lo que
+confirma que el ciclo quedo automatizado de extremo a extremo, desde el push del
+codigo hasta la aplicacion corriendo en produccion.
+
+Archivos de entrega:
+.github/workflows/docker-render.yml
+Practica Entrega Continua/Practica CI-CD Github Actions.txt
+
+
+===============================================================================
+PRACTICA 4 - MAPA MENTAL DE MEJORES PRACTICAS EN DEVOPS
+===============================================================================
+
+Consigna: elaborar un mapa mental sobre las mejores practicas en DevOps.
+
+Se elaboro un grafico con un nodo central "DevOps - Mejores Practicas" del que
+parten las 10 areas del documento, cada una con sus ideas derivadas. Se mantuvo
+la numeracion y el orden del documento original, y se asigno un color distinto a
+cada rama para diferenciarlas visualmente.
+
+Las 10 areas representadas:
+1. Cultura y Colaboracion
+2. Automatizacion
+3. Gestion de Configuracion
+4. Seguridad (DevSecOps)
+5. Supervision y Metricas
+6. Escalabilidad y Resiliencia
+7. Iteracion y Mejora Continua
+8. Uso de Herramientas Adecuadas
+9. Documentacion
+10. Adaptacion a la Nube
+
+Archivos de entrega:
+Practica Mapa Mental DevOps/mapa-mental-devops.png   (para subir a la plataforma)
+Practica Mapa Mental DevOps/mapa-mental-devops.pdf   (vectorial, para imprimir)
+Practica Mapa Mental DevOps/mapa-mental-devops.svg   (fuente editable)
+
+
+===============================================================================
+PRACTICA 5 - PRACTICA FINAL DEVOPS: CI/CD COMPLETO CON GITHUB (20 PTS)
+===============================================================================
+
+Consigna: integrar todo lo aprendido en el curso. Repositorio git con una app web
+hola mundo, prueba unitaria, Dockerfile, y un GitHub Actions que al hacer push
+instale dependencias, ejecute la prueba, suba la imagen a Docker Hub y publique la
+aplicacion en produccion.
+
+PASO 1 - Aplicacion web
+App en Python con Flask, en la carpeta "Practica Final Devops CI-CD con Github".
+Se construye dentro de una funcion crear_app, lo que permite instanciarla en las
+pruebas sin levantar un servidor real. Expone dos rutas: / devuelve el mensaje
+"Hola Mundo - Practica Final DevOps CI/CD con GitHub", y /salud devuelve un JSON
+de estado que el pipeline usa para comprobar que quedo viva en produccion.
+El puerto se lee de la variable de entorno PORT, con 5000 por defecto.
+
+Las dependencias se separaron en dos archivos a proposito: requirements.txt con
+flask y gunicorn (lo que necesita la app para correr) y requirements-dev.txt con
+pytest (solo para las pruebas), de modo que la imagen de Docker no cargue con
+herramientas de desarrollo que en produccion no se usan.
+
+PASO 2 - Prueba unitaria
+Archivo test_app.py con pytest. Un fixture llamado cliente crea la app en modo
+TESTING y devuelve un cliente de pruebas de Flask, con el que se hacen peticiones
+HTTP simuladas sin levantar el servidor. Cuatro pruebas:
+
+  test_la_raiz_responde_200                    la ruta / responde HTTP 200
+  test_la_raiz_devuelve_el_mensaje_hola_mundo  el cuerpo es el mensaje esperado
+  test_salud_devuelve_json_con_estado_ok       /salud devuelve el JSON correcto
+  test_una_ruta_inexistente_devuelve_404       caso negativo, ruta inexistente
+
+Comandos utilizados:
+pip install -r requirements.txt -r requirements-dev.txt
+pytest -v
+
+Resultado: 4 passed, tanto en local como en el runner de GitHub.
+
+PASO 3 - Dockerfile
+Basado en python:3.12-slim. Define PYTHONDONTWRITEBYTECODE y PYTHONUNBUFFERED
+para que no se generen .pyc y los logs salgan al momento. Copia primero
+requirements.txt e instala las dependencias, y solo despues copia app.py, de modo
+que Docker reutilice la capa de dependencias en cache mientras no cambien las
+librerias. Crea el usuario appuser y ejecuta con ese usuario en lugar de root,
+como buena practica de seguridad. Arranca con gunicorn, un servidor WSGI apto
+para produccion, en vez del servidor de desarrollo de Flask.
+
+Se agrego un .dockerignore para que las pruebas, las cachees y la documentacion
+no entren en la imagen.
+
+PASO 4 - Pipeline de GitHub Actions
+Archivo .github/workflows/practica-final-cicd.yml, en la raiz del repositorio.
+
+Disparadores: push a main o Electiva-integracion-continua, pull request, y
+ejecucion manual con workflow_dispatch. Se agrego un filtro paths para que este
+pipeline solo corra cuando cambian los archivos de esta practica o el propio
+workflow, y no se dispare en cada push del resto del repositorio ni choque con el
+pipeline de la practica anterior, que sigue existiendo en el mismo repo.
+
+Job 1 - pruebas
+Checkout, instalacion de Python 3.12 con cache de pip, instalacion de las
+dependencias de ambos requirements y ejecucion de pytest -v. Si una prueba falla,
+el pipeline se detiene aqui y no se publica nada.
+
+Job 2 - build-and-push
+Depende del anterior con needs. Configura Buildx, hace login en Docker Hub con
+los secretos y publica la imagen con dos etiquetas, latest y el hash del commit.
+Usa la cache de GitHub Actions para acelerar las reconstrucciones. Se salta en
+los pull requests, para no publicar imagenes de codigo aun no integrado.
+
+Job 3 - deploy
+Depende del anterior. POST a la API de Render para lanzar el despliegue,
+verificando el codigo HTTP y fallando de forma explicita si Render lo rechaza.
+Despues consulta la URL de produccion en un bucle de reintentos hasta recibir un
+200, confirmando que la version nueva quedo realmente publicada y respondiendo.
+Esta ultima comprobacion es la diferencia principal con el pipeline de la
+practica anterior, que daba por bueno el despliegue con solo aceptar la peticion.
+
+SECRETOS Y VARIABLES CONFIGURADOS EN GITHUB
+
+DOCKERHUB_USERNAME        Usuario de Docker Hub (ya existia)
+DOCKERHUB_TOKEN           Access token con permisos Read & Write (ya existia)
+RENDER_API_KEY            API key de Render (ya existia)
+RENDER_SERVICE_ID_FINAL   Identificador del servicio nuevo de esta practica
+URL_PRODUCCION            Variable, no secreto: URL publica que usa el ultimo
+                          paso del pipeline para verificar que responde 200
+
+Se reutilizaron los tres primeros de las practicas anteriores. El identificador
+del servicio se guardo con un nombre distinto (RENDER_SERVICE_ID_FINAL) para no
+pisar el de la practica anterior, que sigue desplegando su propio servicio.
+
+CONFIGURACION DEL SERVICIO EN RENDER
+Web Service con origen "Existing Image", apuntando a
+docker.io/printbagm/practica-final-devops:latest, region Oregon, plan Free y sin
+variables de entorno, ya que Render inyecta PORT por su cuenta y la app la lee.
+
+PROBLEMAS ENCONTRADOS Y SOLUCIONES
+
+Problema 1: en la primera ejecucion, los jobs de pruebas y de Docker Hub pasaron
+pero el de Render fallo con HTTP 404 y el mensaje "not found: service", porque el
+secreto RENDER_SERVICE_ID_FINAL todavia estaba vacio.
+Causa: hay un orden obligado. El servicio de Render se crea a partir de una imagen
+que ya debe existir en Docker Hub, asi que la primera ejecucion tiene que publicar
+la imagen antes de que se pueda crear el servicio.
+Solucion: dejar que el primer push publicara la imagen, crear el Web Service en
+Render a partir de ella, cargar el secreto y la variable, y relanzar el workflow.
+
+Problema 2: Docker Desktop no llegaba a arrancar en la maquina local (el pipe
+dockerDesktopLinuxEngine no existia), por lo que no se pudo construir la imagen
+en local para probarla.
+Solucion: se verifico el Dockerfile en el runner de GitHub, que lo construyo y
+publico sin errores. Antes de eso se comprobo en local que el punto de entrada
+que usa gunicorn (app:app) se importa correctamente y expone las dos rutas.
+
+Problema 3: al crear el servicio, Render rellena el nombre automaticamente con el
+de la imagen incluyendo la etiqueta, quedando "practica-final-devops:latest".
+Como el nombre determina la URL publica, se corrigio a "practica-final-devops".
+
+VERIFICACION FINAL
+Ejecucion completa del pipeline con los tres jobs en verde, disparada por un push
+real al repositorio.
+
+Job pruebas: 4 passed, las cuatro pruebas en PASSED.
+Job build-and-push: imagen publicada con las etiquetas latest y el hash del commit.
+Job deploy: la API de Render respondio HTTP 201 y el paso de verificacion recibio
+HTTP 200 con el cuerpo "Hola Mundo - Practica Final DevOps CI/CD con GitHub".
+
+Comprobacion manual de las dos rutas en produccion:
+
+  GET /        Hola Mundo - Practica Final DevOps CI/CD con GitHub
+  GET /salud   devuelve el JSON con estado ok y el mismo mensaje
+
+Queda demostrado el ciclo completo: push del codigo, pruebas unitarias, imagen en
+Docker Hub, despliegue en produccion y verificacion de que responde, todo sin
+intervencion manual.
+
+Archivos de entrega:
+Practica Final Devops CI-CD con Github/app.py
+Practica Final Devops CI-CD con Github/test_app.py
+Practica Final Devops CI-CD con Github/Dockerfile
+Practica Final Devops CI-CD con Github/.dockerignore
+Practica Final Devops CI-CD con Github/requirements.txt
+Practica Final Devops CI-CD con Github/requirements-dev.txt
+Practica Final Devops CI-CD con Github/Practica Final Devops CI-CD con Github.txt
+.github/workflows/practica-final-cicd.yml
+
+
+===============================================================================
+NOTAS OPERATIVAS
+===============================================================================
+
+Plan gratuito de Render: el servicio se suspende tras aproximadamente 15 minutos
+sin trafico. La primera visita despues de ese periodo puede tardar entre 30 y 50
+segundos en responder mientras el servicio vuelve a levantarse. Conviene abrir la
+URL unos minutos antes de una demostracion.
+
+Manejo de credenciales: los tokens y API keys se copiaron directamente desde el
+sitio que los emite y se pegaron en el formulario de secretos de GitHub, sin
+guardarlos en archivos ni en el historial. Un token de Docker Hub que quedo
+expuesto durante el proceso fue revocado y reemplazado por uno nuevo.
+
+Repositorios anidados: dentro de la carpeta de la materia existen varios
+directorios que son repositorios git independientes, con su propio .git
+(1erparcial-electiva-2, ansible-lab, Electiva, Electiva-2-devops,
+practica-ansible-docker, practica-python-mysql-docker). No fueron incluidos en
+este repositorio porque git los agregaria como referencias vacias en lugar de
+subir sus archivos. Si se quisieran integrar, habria que eliminar su .git interno,
+perdiendo su historial individual, o subirlos por separado a sus propios remotos.
