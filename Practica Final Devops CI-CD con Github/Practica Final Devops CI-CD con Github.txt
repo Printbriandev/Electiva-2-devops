@@ -182,13 +182,51 @@ etapa detiene las siguientes.
 Repositorio publico de GitHub:
 https://github.com/Printbriandev/Electiva-2-devops
 
+Carpeta de esta practica dentro del repositorio:
+Practica Final Devops CI-CD con Github
+
+Workflow del pipeline:
+.github/workflows/practica-final-cicd.yml
+
 Imagen en Docker Hub:
 https://hub.docker.com/r/printbagm/practica-final-devops
 
 Aplicacion desplegada en produccion:
-PENDIENTE
+https://practica-final-devops-tip1.onrender.com
 
 
 9. Verificacion del funcionamiento
 
-PENDIENTE
+El pipeline se ejecuto completo y los tres jobs finalizaron correctamente.
+
+Job pruebas
+Instalo las dependencias y ejecuto pytest con el resultado "4 passed", con las
+cuatro pruebas en estado PASSED.
+
+Job build-and-push
+Construyo la imagen desde el Dockerfile y la publico en Docker Hub con las
+etiquetas latest y el hash del commit.
+
+Job deploy
+La API de Render respondio con el codigo HTTP 201, confirmando que acepto e
+inicio el despliegue. A continuacion el paso de verificacion consulto la URL de
+produccion, recibio el codigo HTTP 200 y el cuerpo
+"Hola Mundo - Practica Final DevOps CI/CD con GitHub".
+
+Comprobacion manual de las dos rutas en produccion:
+
+  GET /
+  Hola Mundo - Practica Final DevOps CI/CD con GitHub
+
+  GET /salud
+  {"estado":"ok","mensaje":"Hola Mundo - Practica Final DevOps CI/CD con GitHub"}
+
+Con esto queda demostrado el ciclo completo de DevOps automatizado: desde el push
+del codigo al repositorio hasta la aplicacion corriendo y respondiendo en
+produccion, pasando por las pruebas unitarias y la publicacion de la imagen en
+Docker Hub, sin ninguna intervencion manual.
+
+Nota sobre el plan Free de Render: el servicio se suspende tras un periodo sin
+trafico, por lo que la primera peticion despues de un rato de inactividad puede
+tardar cerca de un minuto en responder mientras el contenedor vuelve a arrancar.
+Es el comportamiento normal del plan gratuito y no afecta al funcionamiento.
